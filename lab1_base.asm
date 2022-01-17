@@ -27,9 +27,8 @@ LCD_RIGHT equ p2.3 ; For scrolling the LCD to the right
 ;---------------------------------;
 Wait40uSec:
     push AR0
-    ;mov R0, #177 Original 
-    ;For testing
-    mov R0, #1
+    mov R0, #177
+    ;mov R0, #1 ;For testing
 L0:
     nop
     nop
@@ -119,8 +118,6 @@ LCD_4BIT:
     ; First make sure the LCD is in 8-bit mode and then change to 4-bit mode
     mov a, #0x33
     lcall WriteCommand
-    mov a, #0x33
-    lcall WriteCommand
     mov a, #0x32 ; change to 4-bit mode
     lcall WriteCommand
 
@@ -137,68 +134,6 @@ LCD_4BIT:
     lcall WaitmilliSec
     ret
 
-
-;Used https://stackoverflow.com/questions/14261374/8051-lcd-hello-world-replacing-db-with-variable
-;as a reference for this function
-
-;Writes the string pointed to by dptr(must be null-terminated)
-WriteString:
-	push AR1
-	mov R1, #79 ;LCD holds 80 characters
-nextChar:
-	clr a
-	movc a, @a+dptr
-	jz str_end
-	lcall WriteData
-	inc dptr
-	djnz R1, nextChar
-	lcall CheckForScroll
-	sjmp nextChar
-str_end: 
-	pop AR1
-	ret
-
-;LCD can only hold 80 characters, so need
-;to keep track of how many characters have been read
-;and add new characters once they are requested(through scrolling).
-CheckForScroll:
-	jnb LCD_LEFT, call_left
-	jnb LCD_RIGHT, call_right
-	sjmp CheckForScroll
-;Need to check if we have reached these subroutines from the forever loop
-;or from the checkForScroll(i.e., do more characters need to be written?)
-;R0 will be 0 if we have not reached the forever loop yet
-call_left:
-	inc R1
-	lcall Scroll_left
-    cjne R0, #0, forever
-    sjmp nextChar
-call_right:
-	lcall Scroll_right
-	cjne R0, #0, forever
-	sjmp CheckForScroll
-	
-Scroll_left:
-	mov a, #0x18 ;Instruction code for shifting the display to the left
-	lcall WriteCommand
-	;Commented out for testing
-	;Wait 1 second
-	;push AR2	
-	;mov R2, #100
-	;lcall WaitMilliSec
-	;pop AR2
-	ret
-	
-Scroll_right:
-	mov a, #0x1C ;Instruction code for shifting to the right
-	lcall WriteCommand
-	;Commented out for testing
-	;Wait 1 second
-	;push AR2
-	;mov R2, #100 
-	;lcall WaitMilliSec
-	;pop AR2
-	ret
 ;---------------------------------;
 ; Main loop.  Initialize stack,   ;
 ; ports, LCD, and displays        ;
@@ -206,27 +141,95 @@ Scroll_right:
 ;---------------------------------;
 myprogram:
     mov SP, #7FH
-    push AR0
-    MOV AR0, #0
     lcall LCD_4BIT
-    mov a, #0x80 ; Move cursor to line 1 column 1
-    lcall WriteCommand
-	;mov dptr, #number
-	;lcall WriteString
-	;mov dptr, #name
-	;lcall WriteString
-	mov dptr, #tale_of_two_cities
-	lcall WriteString
-	mov R0, #1
+	mov dptr, #name
+	inc dptr ;Account for the 1 at the beginning of the string
+	;mov dptr, #tale_of_two_cities
+	mov R4, #0 ;String-end status
 	
-forever:
-	jnb LCD_LEFT, call_left
-	jnb LCD_RIGHT, call_right
-	sjmp forever
+;Used https://stackoverflow.com/questions/14261374/8051-lcd-hello-world-replacing-db-with-variable
+;as a reference for this function
+
+;Writes the next 16 characters of the string pointed to by dptr(must be null-terminated)
+WriteString:
+	push dph
+	push dpl
+	mov R1, #16 ;Display the current 16 characters
+	mov a, #0x80 ;Move cursor to line 1 column 1
+    lcall WriteCommand
+    mov a, #0x03 ;Clear Screen
+    lcall WriteCommand
+    mov R2, #2
+    lcall WaitmilliSec
+nextChar:
+	clr a
+	movc a, @a+dptr
+	inc dptr
+	jz str_end
+	lcall WriteData
+	djnz R1, nextChar
+	pop dph
+	pop dpl
+	sjmp CheckForScroll
+str_end: 
+	mov R4, #1
+	pop dph
+	pop dpl
+	sjmp CheckForScroll
+
+;LCD can only hold 80 characters, so need
+;to keep track of how many characters have been read
+;and add new characters once they are requested(through scrolling).
+CheckForScroll:
+	jnb LCD_LEFT, Scroll_left
+	jnb LCD_RIGHT, Scroll_right
+	sjmp CheckForScroll
+
+Scroll_left:
+	cjne R4, #0, same_dptr_left
+	inc dptr
+same_dptr_left:
+	mov a, #0x18 ;Instruction code for shifting the display to the left
+	lcall WriteCommand
+	;Wait 1.5 seconds	
+	mov R2, #150
+	lcall WaitmilliSec
+	sjmp WriteString
+	
+Scroll_right:
+	mov R4, #0 ;Will not be at the end of the string after scrolling right
+	;Check if the beginning of the string has been reached
+	clr a
+	dec a
+	movc a, @a+dptr
+	cjne a, #1, dec_dptr
+	
+same_dptr_right:
+	mov a, #0x1C ;Instruction code for shifting to the right
+	lcall WriteCommand
+	;Wait 1 second
+	mov R2, #150 
+	lcall WaitMilliSec
+	sjmp WriteString
+	
+	;Decrement dptr. Used code from
+	;https://stackoverflow.com/questions/49920045/why-cant-we-decrement-data-pointer-in-alp#:~:text=The%208051%20microcontroller%20was%20built,low%20and%20high%20byte%20separately.
+dec_dptr:
+	mov a, dpl 
+    dec a 
+    jnc skip_dec_dptr
+    mov a, #0xFF 
+    dec dph 
+skip_dec_dptr:
+    mov dpl, a 
+    sjmp same_dptr_right 
+	
+
+	
 	
 ;String which stores my name
 name:
-	db ' Bennett Galamaga', 0
+	db 1, 'Bennett Galamaga 84372515', 0
 
 ;String which stores my student number
 number:
