@@ -27,7 +27,9 @@ LCD_RIGHT equ p2.3 ; For scrolling the LCD to the right
 ;---------------------------------;
 Wait40uSec:
     push AR0
-    mov R0, #177
+    ;mov R0, #177 Original 
+    ;For testing
+    mov R0, #1
 L0:
     nop
     nop
@@ -141,7 +143,7 @@ LCD_4BIT:
 
 ;Writes the string pointed to by dptr(must be null-terminated)
 WriteString:
-	push AR0
+	push AR1
 	mov R1, #79 ;LCD holds 80 characters
 nextChar:
 	clr a
@@ -179,21 +181,23 @@ call_right:
 Scroll_left:
 	mov a, #0x18 ;Instruction code for shifting the display to the left
 	lcall WriteCommand
+	;Commented out for testing
 	;Wait 1 second
-	push AR2	
-	mov R2, #100
-	lcall WaitMilliSec
-	pop AR2
+	;push AR2	
+	;mov R2, #100
+	;lcall WaitMilliSec
+	;pop AR2
 	ret
 	
 Scroll_right:
 	mov a, #0x1C ;Instruction code for shifting to the right
 	lcall WriteCommand
+	;Commented out for testing
 	;Wait 1 second
-	push AR2
-	mov R2, #100
-	lcall WaitMilliSec
-	pop AR2
+	;push AR2
+	;mov R2, #100 
+	;lcall WaitMilliSec
+	;pop AR2
 	ret
 ;---------------------------------;
 ; Main loop.  Initialize stack,   ;
