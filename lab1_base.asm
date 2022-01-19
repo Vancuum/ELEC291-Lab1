@@ -142,39 +142,40 @@ LCD_4BIT:
 myprogram:
     mov SP, #7FH
     lcall LCD_4BIT
-	mov dptr, #name
-	inc dptr ;Account for the 1 at the beginning of the string
-	;mov dptr, #tale_of_two_cities
-	mov R4, #0 ;String-end status
+	;mov dptr, #name
+	mov dptr, #test_string
+	;Store the start address of the string into two registers for checking 
+	;if we have reached the start of the string (See scroll_right)
+	inc dptr
+	mov R5, dph
+	mov R4, dpl
+	
 	
 ;Used https://stackoverflow.com/questions/14261374/8051-lcd-hello-world-replacing-db-with-variable
 ;as a reference for this function
 
 ;Writes the next 16 characters of the string pointed to by dptr(must be null-terminated)
 WriteString:
+	;Each new character is written by writing the next 16 characters of the data-pointer
+	;so need to store the data pointer for later, otherwise we will be jumping 16 characters at a time
+	;instead of 1
 	push dph
 	push dpl
-	mov R1, #16 ;Display the current 16 characters
+	mov R1, #16 ;Counter to tell how many characters to print
 	mov a, #0x80 ;Move cursor to line 1 column 1
     lcall WriteCommand
-    mov a, #0x03 ;Clear Screen
+    mov a, #0x02 ;Clear Screen
     lcall WriteCommand
-    mov R2, #2
+    mov R2, #2 ;Allow time for the screen to clear
     lcall WaitmilliSec
 nextChar:
-	clr a
+	clr a ;Want to store current data pointed to by dptr into a, so prepare a for movc command
 	movc a, @a+dptr
-	inc dptr
-	jz str_end
-	lcall WriteData
-	djnz R1, nextChar
+	inc dptr ;Need to increment dptr otherwise will print the same char over and over
+	lcall WriteData ;Write the character stored in a to the LCD
+	djnz R1, nextChar ;Keep track of how many characters have been written
+	pop dpl ;After writing 16 characters, restore the dptr to its state before writing
 	pop dph
-	pop dpl
-	sjmp CheckForScroll
-str_end: 
-	mov R4, #1
-	pop dph
-	pop dpl
 	sjmp CheckForScroll
 
 ;LCD can only hold 80 characters, so need
@@ -186,55 +187,63 @@ CheckForScroll:
 	sjmp CheckForScroll
 
 Scroll_left:
-	cjne R4, #0, same_dptr_left
+	;Check if the end of the string has been reached
+	mov a, #16 ;Need to offset by 16 characters so we can see if we've reached the end without displaying the 15 characters after the 0
+	movc a, @a+dptr
+	jz same_dptr_left
 	inc dptr
 same_dptr_left:
 	mov a, #0x18 ;Instruction code for shifting the display to the left
 	lcall WriteCommand
-	;Wait 1.5 seconds	
-	mov R2, #150
+	;Wait 0.08 seconds	
+	mov R2, #80
 	lcall WaitmilliSec
+	;call Wait40usec ;For testing
 	sjmp WriteString
 	
 Scroll_right:
-	mov R4, #0 ;Will not be at the end of the string after scrolling right
-	;Check if the beginning of the string has been reached
-	clr a
-	dec a
-	movc a, @a+dptr
-	cjne a, #1, dec_dptr
-	
-same_dptr_right:
-	mov a, #0x1C ;Instruction code for shifting to the right
-	lcall WriteCommand
-	;Wait 1 second
-	mov R2, #150 
-	lcall WaitMilliSec
-	sjmp WriteString
+    clr a
+    movc a, @a+dptr
+    jz same_dptr_right       
+	;Check if dptr is pointing to the beginning of the string
+	;clr c
+	;mov a, R5
+	;subb a, dph
+	;jnz dec_dptr
+	;clr c
+	;mov a, R4
+	;subb a, dpl
+	;jnz dec_dptr
 	
 	;Decrement dptr. Used code from
 	;https://stackoverflow.com/questions/49920045/why-cant-we-decrement-data-pointer-in-alp#:~:text=The%208051%20microcontroller%20was%20built,low%20and%20high%20byte%20separately.
 dec_dptr:
+	clr c
 	mov a, dpl 
     dec a 
     jnc skip_dec_dptr
     mov a, #0xFF 
-    dec dph 
+    dec dph
 skip_dec_dptr:
     mov dpl, a 
     sjmp same_dptr_right 
 	
-
-	
-	
+same_dptr_right:
+	mov a, #0x1C ;Instruction code for shifting to the right
+	lcall WriteCommand
+	;Wait 0.08 seconds
+	mov R2, #80
+	lcall WaitMilliSec
+	;lcall Wait40usec ;For testing
+	sjmp WriteString
+    
 ;String which stores my name
 name:
-	db 1, 'Bennett Galamaga 84372515', 0
-
-;String which stores my student number
-number:
-	db '84372515', 0
+	db 'Bennett Galamaga 84372515', 0
 	
+test_string:
+	db 'This is a test string that is long enough that it cannot be stored in memory but not so long that it is impractical to debug. WOOOHOOOOOOOOOOOOOOOOOO!!!', 0
+
 tale_of_two_cities:
 	db 'A TALE OF TWO CITIES  A STORY OF THE FRENCH REVOLUTION  By Charles Dickens CHAPTER I. The Period '
 	db 'It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of '
