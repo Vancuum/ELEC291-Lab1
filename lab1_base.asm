@@ -146,10 +146,6 @@ myprogram:
 	mov dptr, #test_string
 	;Store the start address of the string into two registers for checking 
 	;if we have reached the start of the string (See scroll_right)
-	inc dptr
-	mov R5, dph
-	mov R4, dpl
-	
 	
 ;Used https://stackoverflow.com/questions/14261374/8051-lcd-hello-world-replacing-db-with-variable
 ;as a reference for this function
@@ -202,25 +198,17 @@ same_dptr_left:
 	sjmp WriteString
 	
 Scroll_right:
-    clr a
+   	;Check if we have reached the beginning of the string
+    clr a 
     movc a, @a+dptr
     jz same_dptr_right       
-	;Check if dptr is pointing to the beginning of the string
-	;clr c
-	;mov a, R5
-	;subb a, dph
-	;jnz dec_dptr
-	;clr c
-	;mov a, R4
-	;subb a, dpl
-	;jnz dec_dptr
-	
+    
 	;Decrement dptr. Used code from
 	;https://stackoverflow.com/questions/49920045/why-cant-we-decrement-data-pointer-in-alp#:~:text=The%208051%20microcontroller%20was%20built,low%20and%20high%20byte%20separately.
 dec_dptr:
 	clr c
 	mov a, dpl 
-    dec a 
+    subb a, #1 ;Don't use dec since it doesn't set the carry flag
     jnc skip_dec_dptr
     mov a, #0xFF 
     dec dph
